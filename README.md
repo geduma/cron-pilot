@@ -1,32 +1,71 @@
-# React + TypeScript + Vite
+# CronPilot
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+Self-hosted web app for scheduling and monitoring HTTP jobs.
 
-Currently, two official plugins are available:
+## Stack
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+- **Frontend:** React, Vite, TypeScript, TailwindCSS, React Query, Axios
+- **Backend:** Node.js, Fastify, TypeScript
+- **Database:** SQLite (via better-sqlite3)
+- **Auth:** Geduma Auth (external OAuth service)
 
-## React Compiler
+## Setup
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the Oxlint configuration
-
-If you are developing a production application, we recommend enabling type-aware lint rules by installing `oxlint-tsgolint` and editing `.oxlintrc.json`:
-
-```json
-{
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["react", "typescript", "oxc"],
-  "options": {
-    "typeAware": true
-  },
-  "rules": {
-    "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
-}
+```bash
+npm run setup
 ```
 
-See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
+Copy and configure environment variables:
+
+```bash
+cp .env.example .env
+cp frontend/.env.example frontend/.env
+```
+
+## Development
+
+```bash
+npm run dev
+```
+
+Single service on `http://localhost:3000`. The backend compiles the frontend and serves it.
+
+## Build
+
+```bash
+npm run build
+```
+
+## Production
+
+```bash
+npm run start
+```
+
+Requires Nginx in front to serve `frontend/dist/` and proxy `/api/*` to the Node.js backend (see `nginx.conf`).
+
+## Project Structure
+
+```
+cron-pilot/
+├── frontend/          # React SPA
+│   └── src/
+│       ├── components/
+│       ├── pages/
+│       ├── hooks/
+│       ├── services/
+│       └── types/
+├── src/               # Fastify API
+│   ├── routes/
+│   ├── services/
+│   ├── plugins/
+│   └── types/
+├── data/              # SQLite database (gitignored)
+└── docs/
+```
+
+## Database
+
+SQLite file at `./data/cronpilot.db`. Auto-created on first run.
+
+Tables: `jobs`, `job_executions`.

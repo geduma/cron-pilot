@@ -4,7 +4,7 @@
   "description": "Schedule and monitor HTTP jobs",
   "type": "module",
   "scripts": {
-    "dev": "npm run dev:backend & npm run dev:frontend",
+    "dev": "npm run build:frontend && tsx watch src/index.ts",
     "dev:backend": "tsx watch src/index.ts",
     "dev:frontend": "cd frontend && npm run dev",
     "build": "npm run build:frontend && npm run build:backend",
