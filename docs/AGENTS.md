@@ -11,7 +11,7 @@ CronPilot is a self-hosted web app for scheduling and monitoring HTTP jobs. Mono
 **Stack:**
 - Frontend: React 18, Vite, TypeScript, TailwindCSS, React Query, React Router, Axios
 - Backend: Node.js, Fastify, TypeScript
-- Database: PostgreSQL
+- Database: SQLite (file-based, zero config)
 - Auth: Geduma Auth (external OAuth service, GitHub provider)
 
 ---
@@ -35,6 +35,7 @@ cron-pilot/
 │   ├── plugins/           # Fastify plugins (auth.ts, db.ts)
 │   ├── types/             # TypeScript types
 │   └── utils/             # Helpers, migrations
+├── data/                  # SQLite database (gitignored)
 ├── docs/                  # Documentation
 │   ├── specification-v1.0.md
 │   ├── cron-pilot-api-spec.md
@@ -65,7 +66,7 @@ npm run build:frontend     # Build only frontend
 npm run build:backend      # Build only backend
 
 # Database
-npm run migrate            # Run PostgreSQL migrations
+npm run migrate            # Run SQLite migrations
 
 # Production
 npm run start              # Start compiled backend
@@ -123,7 +124,11 @@ Error:
 
 ---
 
-## Database Schema
+## Database
+
+**Engine:** SQLite via better-sqlite3
+
+**File location:** `./data/cronpilot.db`
 
 **Tables:**
 - `jobs` - Scheduled HTTP jobs
@@ -132,14 +137,19 @@ Error:
 **Key fields:**
 - `user_id` - Email from Geduma session (used for data isolation)
 - `next_execution` - Used by scheduler to detect pending jobs
-- `enabled` - Toggle job on/off
+- `enabled` - Toggle job on/off (INTEGER: 1 or 0)
+
+**Notes:**
+- Dates stored as TEXT (ISO 8601)
+- Booleans stored as INTEGER (0 or 1)
+- Headers stored as JSON string
 
 ---
 
 ## Scheduler Behavior
 
 - Runs every 60 seconds
-- Queries `jobs WHERE enabled=true AND next_execution <= NOW()`
+- Queries `jobs WHERE enabled=1 AND next_execution <= datetime('now')`
 - Executes HTTP request with 30s timeout
 - Saves result in `job_executions`
 - Updates `last_execution` and calculates new `next_execution`
@@ -152,6 +162,7 @@ Single server with Nginx:
 - Nginx serves frontend static files from `frontend/dist/`
 - Nginx proxies `/api/*` to Node.js backend (port 3000)
 - Backend serves as systemd service or PM2
+- SQLite database file persists in `data/` directory
 
 ---
 
@@ -162,3 +173,4 @@ Single server with Nginx:
 - No response headers stored (simplification)
 - Timeout: 30 seconds default per job
 - Data isolation: each user sees only their own jobs
+- SQLite = zero config, file-based, self-contained

@@ -11,60 +11,55 @@ export default async function dashboardRoutes(fastify: FastifyInstance): Promise
     const userId = request.user.userId;
 
     // Get active and paused jobs count
-    const jobsCount = await fastify.db.query(
-      `SELECT 
-        COUNT(*) FILTER (WHERE enabled = true) as active_jobs,
-        COUNT(*) FILTER (WHERE enabled = false) as paused_jobs
-       FROM jobs WHERE user_id = $1`,
-      [userId]
-    );
+    const jobsCount = fastify.db.prepare(
+      `SELECT
+        COUNT(CASE WHEN enabled = 1 THEN 1 END) as active_jobs,
+        COUNT(CASE WHEN enabled = 0 THEN 1 END) as paused_jobs
+       FROM jobs WHERE user_id = ?`
+    ).get(userId) as { active_jobs: number; paused_jobs: number };
 
     // Get total executions
-    const executionsCount = await fastify.db.query(
+    const executionsCount = fastify.db.prepare(
       `SELECT COUNT(*) as total
        FROM job_executions je
        JOIN jobs j ON je.job_id = j.id
-       WHERE j.user_id = $1`,
-      [userId]
-    );
+       WHERE j.user_id = ?`
+    ).get(userId) as { total: number };
 
     // Get errors in last 24h
-    const errorsCount = await fastify.db.query(
+    const errorsCount = fastify.db.prepare(
       `SELECT COUNT(*) as total
        FROM job_executions je
        JOIN jobs j ON je.job_id = j.id
-       WHERE j.user_id = $1
+       WHERE j.user_id = ?
          AND je.status IN ('FAILED', 'TIMEOUT')
-         AND je.executed_at >= NOW() - INTERVAL '24 hours'`,
-      [userId]
-    );
+         AND je.executed_at >= datetime('now', '-24 hours')`
+    ).get(userId) as { total: number };
 
     // Get last execution
-    const lastExecution = await fastify.db.query(
+    const lastExecution = fastify.db.prepare(
       `SELECT je.executed_at
        FROM job_executions je
        JOIN jobs j ON je.job_id = j.id
-       WHERE j.user_id = $1
+       WHERE j.user_id = ?
        ORDER BY je.executed_at DESC
-       LIMIT 1`,
-      [userId]
-    );
+       LIMIT 1`
+    ).get(userId) as { executed_at: string } | undefined;
 
     // Get next execution
-    const nextExecution = await fastify.db.query(
+    const nextExecution = fastify.db.prepare(
       `SELECT MIN(next_execution) as next
        FROM jobs
-       WHERE user_id = $1 AND enabled = true AND next_execution > NOW()`,
-      [userId]
-    );
+       WHERE user_id = ? AND enabled = 1 AND next_execution > datetime('now')`
+    ).get(userId) as { next: string } | undefined;
 
     const stats: DashboardStats = {
-      activeJobs: parseInt(jobsCount.rows[0]?.active_jobs || '0'),
-      pausedJobs: parseInt(jobsCount.rows[0]?.paused_jobs || '0'),
-      totalExecutions: parseInt(executionsCount.rows[0]?.total || '0'),
-      errorsLast24h: parseInt(errorsCount.rows[0]?.total || '0'),
-      lastExecution: lastExecution.rows[0]?.executed_at?.toISOString() || null,
-      nextExecution: nextExecution.rows[0]?.next?.toISOString() || null
+      activeJobs: jobsCount?.active_jobs || 0,
+      pausedJobs: jobsCount?.paused_jobs || 0,
+      totalExecutions: executionsCount?.total || 0,
+      errorsLast24h: errorsCount?.total || 0,
+      lastExecution: lastExecution?.executed_at || null,
+      nextExecution: nextExecution?.next || null
     };
 
     const response: ApiResponse<DashboardStats> = {

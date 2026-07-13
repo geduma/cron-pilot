@@ -21,7 +21,7 @@ const fastify = Fastify({
 
 // CORS
 await fastify.register(cors, {
-  origin: process.env.NODE_ENV === 'production' 
+  origin: process.env.NODE_ENV === 'production'
     ? true // Allow all origins in production
     : ['http://localhost:5173', 'http://localhost:3000'],
   credentials: true
@@ -48,7 +48,7 @@ fastify.setNotFoundHandler((request, reply) => {
       message: 'API endpoint not found'
     });
   }
-  
+
   return reply.sendFile('index.html');
 });
 
@@ -56,7 +56,8 @@ fastify.setNotFoundHandler((request, reply) => {
 async function start() {
   try {
     // Initialize database
-    await initDatabase();
+    const db = initDatabase();
+    fastify.decorate('db', db);
 
     // Start scheduler
     const scheduler = new Scheduler(fastify.db);
@@ -67,7 +68,7 @@ async function start() {
     const host = process.env.HOST || '0.0.0.0';
 
     await fastify.listen({ port, host });
-    
+
     console.log(`Server running on http://${host}:${port}`);
     console.log(`Frontend served from: ${frontendDistPath}`);
   } catch (err) {
@@ -80,14 +81,14 @@ async function start() {
 process.on('SIGTERM', async () => {
   console.log('SIGTERM received, shutting down...');
   await fastify.close();
-  await closeDatabase();
+  closeDatabase();
   process.exit(0);
 });
 
 process.on('SIGINT', async () => {
   console.log('SIGINT received, shutting down...');
   await fastify.close();
-  await closeDatabase();
+  closeDatabase();
   process.exit(0);
 });
 

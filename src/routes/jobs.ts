@@ -2,6 +2,7 @@ import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { authMiddleware } from '../plugins/auth.js';
 import type { CreateJobRequest, UpdateJobRequest, Job, ApiResponse } from '../types/index.js';
 import { calculateNextExecution } from '../utils/helpers.js';
+import { mapRowToCamel, mapRowsToCamel } from '../utils/mappers.js';
 
 interface JobParams {
   id: string;
@@ -21,14 +22,15 @@ export default async function jobsRoutes(fastify: FastifyInstance): Promise<void
   fastify.get('/api/jobs', async (request: FastifyRequest, reply: FastifyReply) => {
     const userId = request.user.userId;
 
-    const result = await fastify.db.query(
-      'SELECT * FROM jobs WHERE user_id = $1 ORDER BY created_at DESC',
-      [userId]
+    const stmt = fastify.db.prepare(
+      'SELECT * FROM jobs WHERE user_id = ? ORDER BY created_at DESC'
     );
+    const rows = stmt.all(userId);
+    const jobs = mapRowsToCamel<Job>(rows as Record<string, unknown>[]);
 
     const response: ApiResponse<Job[]> = {
       success: true,
-      data: result.rows,
+      data: jobs,
       message: ''
     };
 
@@ -56,29 +58,34 @@ export default async function jobsRoutes(fastify: FastifyInstance): Promise<void
     }
 
     const nextExecution = calculateNextExecution(body.frequency);
+    const id = crypto.randomUUID();
 
-    const result = await fastify.db.query(
-      `INSERT INTO jobs (user_id, name, description, method, url, headers, body, expected_status, frequency, enabled, next_execution)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
-       RETURNING *`,
-      [
-        userId,
-        body.name,
-        body.description || null,
-        body.method,
-        body.url,
-        JSON.stringify(body.headers || {}),
-        body.body || null,
-        body.expectedStatus || 200,
-        body.frequency,
-        body.enabled !== false,
-        nextExecution
-      ]
+    const stmt = fastify.db.prepare(
+      `INSERT INTO jobs (id, user_id, name, description, method, url, headers, body, expected_status, frequency, enabled, next_execution)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     );
+
+    stmt.run(
+      id,
+      userId,
+      body.name,
+      body.description || null,
+      body.method,
+      body.url,
+      JSON.stringify(body.headers || {}),
+      body.body || null,
+      body.expectedStatus || 200,
+      body.frequency,
+      body.enabled !== false ? 1 : 0,
+      nextExecution
+    );
+
+    const created = fastify.db.prepare('SELECT * FROM jobs WHERE id = ?').get(id);
+    const job = mapRowToCamel<Job>(created as Record<string, unknown>);
 
     const response: ApiResponse<Job> = {
       success: true,
-      data: result.rows[0],
+      data: job,
       message: 'Job created'
     };
 
@@ -90,21 +97,23 @@ export default async function jobsRoutes(fastify: FastifyInstance): Promise<void
     const userId = request.user.userId;
     const { id } = request.params;
 
-    const result = await fastify.db.query(
-      'SELECT * FROM jobs WHERE id = $1 AND user_id = $2',
-      [id, userId]
+    const stmt = fastify.db.prepare(
+      'SELECT * FROM jobs WHERE id = ? AND user_id = ?'
     );
+    const row = stmt.get(id, userId);
 
-    if (result.rows.length === 0) {
+    if (!row) {
       return reply.status(404).send({
         success: false,
         message: 'Job not found'
       });
     }
 
+    const job = mapRowToCamel<Job>(row as Record<string, unknown>);
+
     const response: ApiResponse<Job> = {
       success: true,
-      data: result.rows[0],
+      data: job,
       message: ''
     };
 
@@ -118,74 +127,70 @@ export default async function jobsRoutes(fastify: FastifyInstance): Promise<void
     const body = request.body;
 
     // Check if job exists
-    const existing = await fastify.db.query(
-      'SELECT * FROM jobs WHERE id = $1 AND user_id = $2',
-      [id, userId]
-    );
+    const existing = fastify.db.prepare(
+      'SELECT * FROM jobs WHERE id = ? AND user_id = ?'
+    ).get(id, userId);
 
-    if (existing.rows.length === 0) {
+    if (!existing) {
       return reply.status(404).send({
         success: false,
         message: 'Job not found'
       });
     }
 
-    const existingJob = existing.rows[0];
-
     // Build update query dynamically
     const updates: string[] = [];
     const values: unknown[] = [];
-    let paramIndex = 1;
 
     if (body.name !== undefined) {
-      updates.push(`name = $${paramIndex++}`);
+      updates.push('name = ?');
       values.push(body.name);
     }
     if (body.description !== undefined) {
-      updates.push(`description = $${paramIndex++}`);
+      updates.push('description = ?');
       values.push(body.description);
     }
     if (body.method !== undefined) {
-      updates.push(`method = $${paramIndex++}`);
+      updates.push('method = ?');
       values.push(body.method);
     }
     if (body.url !== undefined) {
-      updates.push(`url = $${paramIndex++}`);
+      updates.push('url = ?');
       values.push(body.url);
     }
     if (body.headers !== undefined) {
-      updates.push(`headers = $${paramIndex++}`);
+      updates.push('headers = ?');
       values.push(JSON.stringify(body.headers));
     }
     if (body.body !== undefined) {
-      updates.push(`body = $${paramIndex++}`);
+      updates.push('body = ?');
       values.push(body.body);
     }
     if (body.expectedStatus !== undefined) {
-      updates.push(`expected_status = $${paramIndex++}`);
+      updates.push('expected_status = ?');
       values.push(body.expectedStatus);
     }
     if (body.frequency !== undefined) {
-      updates.push(`frequency = $${paramIndex++}`);
+      updates.push('frequency = ?');
       values.push(body.frequency);
       // Recalculate next execution if frequency changed
-      const newFrequency = body.frequency || existingJob.frequency;
-      const nextExecution = calculateNextExecution(newFrequency, new Date());
-      updates.push(`next_execution = $${paramIndex++}`);
+      const nextExecution = calculateNextExecution(body.frequency, new Date());
+      updates.push('next_execution = ?');
       values.push(nextExecution);
     }
     if (body.enabled !== undefined) {
-      updates.push(`enabled = $${paramIndex++}`);
-      values.push(body.enabled);
+      updates.push('enabled = ?');
+      values.push(body.enabled ? 1 : 0);
     }
 
-    updates.push(`updated_at = NOW()`);
+    updates.push("updated_at = datetime('now')");
 
     if (updates.length === 1) {
       // Only updated_at, nothing to update
+      const job = mapRowToCamel<Job>(existing as Record<string, unknown>);
       const response: ApiResponse<Job> = {
         success: true,
-        data: existingJob,
+        data: job,
         message: 'Job unchanged'
       };
       return reply.send(response);
@@ -193,14 +198,16 @@ export default async function jobsRoutes(fastify: FastifyInstance): Promise<void
 
     values.push(id, userId);
 
-    const result = await fastify.db.query(
-      `UPDATE jobs SET ${updates.join(', ')} WHERE id = $${paramIndex++} AND user_id = $${paramIndex} RETURNING *`,
-      values
-    );
+    fastify.db.prepare(
+      `UPDATE jobs SET ${updates.join(', ')} WHERE id = ? AND user_id = ?`
+    ).run(...values);
+
+    const updated = fastify.db.prepare('SELECT * FROM jobs WHERE id = ?').get(id);
+    const job = mapRowToCamel<Job>(updated as Record<string, unknown>);
 
     const response: ApiResponse<Job> = {
       success: true,
-      data: result.rows[0],
+      data: job,
       message: 'Job updated'
     };
 
@@ -212,12 +219,11 @@ export default async function jobsRoutes(fastify: FastifyInstance): Promise<void
     const userId = request.user.userId;
     const { id } = request.params;
 
-    const result = await fastify.db.query(
-      'DELETE FROM jobs WHERE id = $1 AND user_id = $2 RETURNING id',
-      [id, userId]
-    );
+    const result = fastify.db.prepare(
+      'DELETE FROM jobs WHERE id = ? AND user_id = ?'
+    ).run(id, userId);
 
-    if (result.rows.length === 0) {
+    if (result.changes === 0) {
       return reply.status(404).send({
         success: false,
         message: 'Job not found'
@@ -238,19 +244,18 @@ export default async function jobsRoutes(fastify: FastifyInstance): Promise<void
     const userId = request.user.userId;
     const { id } = request.params;
 
-    const result = await fastify.db.query(
-      'SELECT * FROM jobs WHERE id = $1 AND user_id = $2',
-      [id, userId]
-    );
+    const row = fastify.db.prepare(
+      'SELECT * FROM jobs WHERE id = ? AND user_id = ?'
+    ).get(id, userId);
 
-    if (result.rows.length === 0) {
+    if (!row) {
       return reply.status(404).send({
         success: false,
         message: 'Job not found'
       });
     }
 
-    const job = result.rows[0];
+    const job = mapRowToCamel<Job>(row as Record<string, unknown>);
 
     // Execute the job
     const startTime = Date.now();
@@ -263,8 +268,8 @@ export default async function jobsRoutes(fastify: FastifyInstance): Promise<void
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 30000); // 30s timeout
 
-      const headers: Record<string, string> = typeof job.headers === 'string' 
-        ? JSON.parse(job.headers) 
+      const headers: Record<string, string> = typeof job.headers === 'string'
+        ? JSON.parse(job.headers)
         : job.headers || {};
 
       const fetchOptions: RequestInit = {
@@ -283,9 +288,9 @@ export default async function jobsRoutes(fastify: FastifyInstance): Promise<void
       httpStatus = response.status;
       responseBody = await response.text();
 
-      if (httpStatus !== job.expected_status) {
+      if (httpStatus !== job.expectedStatus) {
         status = 'FAILED';
-        errorMessage = `Expected status ${job.expected_status}, got ${httpStatus}`;
+        errorMessage = `Expected status ${job.expectedStatus}, got ${httpStatus}`;
       }
     } catch (error) {
       const err = error as Error;
@@ -299,24 +304,23 @@ export default async function jobsRoutes(fastify: FastifyInstance): Promise<void
     }
 
     const durationMs = Date.now() - startTime;
+    const executionId = crypto.randomUUID();
 
     // Save execution
-    const executionResult = await fastify.db.query(
-      `INSERT INTO job_executions (job_id, status, http_status, duration_ms, response_body, error_message)
-       VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
-      [id, status, httpStatus, durationMs, responseBody || null, errorMessage || null]
-    );
+    fastify.db.prepare(
+      `INSERT INTO job_executions (id, job_id, status, http_status, duration_ms, response_body, error_message)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`
+    ).run(executionId, id, status, httpStatus, durationMs, responseBody || null, errorMessage || null);
 
     // Update job last_execution
-    await fastify.db.query(
-      'UPDATE jobs SET last_execution = NOW(), updated_at = NOW() WHERE id = $1',
-      [id]
-    );
+    fastify.db.prepare(
+      "UPDATE jobs SET last_execution = datetime('now'), updated_at = datetime('now') WHERE id = ?"
+    ).run(id);
 
     const response = {
       success: true,
       data: {
-        executionId: executionResult.rows[0].id,
+        executionId,
         status,
         httpStatus,
         durationMs,
@@ -335,19 +339,18 @@ export default async function jobsRoutes(fastify: FastifyInstance): Promise<void
     const { limit = 50, offset = 0, filter } = request.query;
 
     // Verify job belongs to user
-    const jobCheck = await fastify.db.query(
-      'SELECT id FROM jobs WHERE id = $1 AND user_id = $2',
-      [id, userId]
-    );
+    const jobCheck = fastify.db.prepare(
+      'SELECT id FROM jobs WHERE id = ? AND user_id = ?'
+    ).get(id, userId);
 
-    if (jobCheck.rows.length === 0) {
+    if (!jobCheck) {
       return reply.status(404).send({
         success: false,
         message: 'Job not found'
       });
     }
 
-    let query = 'SELECT * FROM job_executions WHERE job_id = $1';
+    let query = 'SELECT * FROM job_executions WHERE job_id = ?';
     const params: unknown[] = [id];
 
     if (filter) {
@@ -365,17 +368,18 @@ export default async function jobsRoutes(fastify: FastifyInstance): Promise<void
         default:
           interval = '24 hours';
       }
-      query += ` AND executed_at >= NOW() - INTERVAL '${interval}'`;
+      query += ` AND executed_at >= datetime('now', '-${interval}')`;
     }
 
-    query += ' ORDER BY executed_at DESC LIMIT $2 OFFSET $3';
+    query += ' ORDER BY executed_at DESC LIMIT ? OFFSET ?';
     params.push(limit, offset);
 
-    const result = await fastify.db.query(query, params);
+    const rows = fastify.db.prepare(query).all(...params);
+    const executions = mapRowsToCamel(rows as Record<string, unknown>[]);
 
     const response = {
       success: true,
-      data: result.rows,
+      data: executions,
       message: ''
     };
 

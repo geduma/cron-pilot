@@ -1,13 +1,13 @@
-import type { Pool } from 'pg';
-import type { Job, JobFrequency } from '../types/index.js';
+import type Database from 'better-sqlite3';
+import type { Job } from '../types/index.js';
 import { calculateNextExecution } from '../utils/helpers.js';
 
 export class Scheduler {
   private intervalId: NodeJS.Timeout | null = null;
-  private db: Pool;
+  private db: Database.Database;
   private isRunning = false;
 
-  constructor(db: Pool) {
+  constructor(db: Database.Database) {
     this.db = db;
   }
 
@@ -18,7 +18,7 @@ export class Scheduler {
     }
 
     console.log('Starting scheduler...');
-    
+
     // Run immediately on start
     this.run().catch(console.error);
 
@@ -46,15 +46,15 @@ export class Scheduler {
 
     try {
       // Find jobs that need to be executed
-      const result = await this.db.query(
-        `SELECT * FROM jobs 
-         WHERE enabled = true 
-         AND next_execution <= NOW()
+      const stmt = this.db.prepare(
+        `SELECT * FROM jobs
+         WHERE enabled = 1
+         AND next_execution <= datetime('now')
          ORDER BY next_execution ASC
          LIMIT 10`
       );
 
-      const jobs = result.rows as Job[];
+      const jobs = stmt.all() as Job[];
 
       if (jobs.length > 0) {
         console.log(`Found ${jobs.length} jobs to execute`);
@@ -123,23 +123,22 @@ export class Scheduler {
     }
 
     const durationMs = Date.now() - startTime;
+    const executionId = crypto.randomUUID();
 
     // Save execution
-    await this.db.query(
-      `INSERT INTO job_executions (job_id, status, http_status, duration_ms, response_body, error_message)
-       VALUES ($1, $2, $3, $4, $5, $6)`,
-      [job.id, status, httpStatus, durationMs, responseBody || null, errorMessage || null]
-    );
+    this.db.prepare(
+      `INSERT INTO job_executions (id, job_id, status, http_status, duration_ms, response_body, error_message)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`
+    ).run(executionId, job.id, status, httpStatus, durationMs, responseBody || null, errorMessage || null);
 
     // Update job
     const nextExecution = calculateNextExecution(job.frequency, new Date());
-    await this.db.query(
-      `UPDATE jobs 
-       SET last_execution = NOW(), 
-           next_execution = $1,
-           updated_at = NOW()
-       WHERE id = $2`,
-      [nextExecution, job.id]
-    );
+    this.db.prepare(
+      `UPDATE jobs
+       SET last_execution = datetime('now'),
+           next_execution = ?,
+           updated_at = datetime('now')
+       WHERE id = ?`
+    ).run(nextExecution, job.id);
   }
 }

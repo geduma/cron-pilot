@@ -86,7 +86,7 @@ Product Requirements Document v1.0
 
 ### 4.4 Scheduler
 - Runs every minute in the API process
-- Executes jobs where `enabled=true AND next_execution <= now()`
+- Executes jobs where `enabled=1 AND next_execution <= now()`
 - 30-second timeout per job
 - Saves execution result and updates next execution time
 
@@ -114,7 +114,7 @@ Product Requirements Document v1.0
 
 ### 5.2 Backend
 - Node.js + Fastify + TypeScript
-- PostgreSQL database
+- SQLite database (file-based, zero config)
 - Auth via Geduma Auth (external)
 - In-process scheduler
 
@@ -125,6 +125,8 @@ Product Requirements Document v1.0
 - Data isolation by user
 
 ### 5.4 Database
+- SQLite via better-sqlite3
+- File stored at `./data/cronpilot.db`
 - Tables: `jobs`, `job_executions`
 - Indexes on user_id, next_execution, job_id
 
@@ -145,7 +147,7 @@ Product Requirements Document v1.0
 
 ### 6.3 Scalability
 - Single-server deployment
-- PostgreSQL for persistence
+- SQLite for persistence (zero config)
 - No external dependencies besides Geduma Auth
 
 ---
