@@ -1,7 +1,7 @@
 import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { authMiddleware } from '../plugins/auth.js';
 import type { CreateJobRequest, UpdateJobRequest, Job, ApiResponse } from '../types/index.js';
-import { calculateNextExecution } from '../utils/helpers.js';
+import { calculateNextExecution, generateUUID } from '../utils/helpers.js';
 import { mapRowToCamel, mapRowsToCamel } from '../utils/mappers.js';
 
 interface JobParams {
@@ -137,7 +137,7 @@ export default async function jobsRoutes(fastify: FastifyInstance): Promise<void
     }
 
     const nextExecution = calculateNextExecution(body.frequency).toISOString();
-    const id = crypto.randomUUID();
+    const id = generateUUID();
 
     const stmt = fastify.db.prepare(
       `INSERT INTO jobs (id, user_id, name, description, method, url, headers, body, expected_status, frequency, enabled, next_execution)
@@ -383,7 +383,7 @@ export default async function jobsRoutes(fastify: FastifyInstance): Promise<void
     }
 
     const durationMs = Date.now() - startTime;
-    const executionId = crypto.randomUUID();
+    const executionId = generateUUID();
 
     // Save execution
     fastify.db.prepare(

@@ -1,4 +1,9 @@
 import type { JobFrequency } from '../types/index.js';
+import { randomUUID } from 'crypto';
+
+export function generateUUID(): string {
+  return randomUUID();
+}
 
 export const FREQUENCIES: Record<JobFrequency, number> = {
   '1m': 1 * 60 * 1000,
