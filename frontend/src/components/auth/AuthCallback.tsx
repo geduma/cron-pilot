@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 
@@ -6,9 +6,13 @@ export function AuthCallback() {
   const [error, setError] = useState<string | null>(null);
   const { handleCallback } = useAuth();
   const navigate = useNavigate();
+  const processed = useRef(false);
 
   useEffect(() => {
     const processCallback = async () => {
+      if (processed.current) return;
+      processed.current = true;
+
       const hash = window.location.hash.substring(1);
       const params = new URLSearchParams(hash);
       const sessionToken = params.get('session_token');
