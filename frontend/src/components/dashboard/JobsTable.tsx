@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import { useJobs, useRunJob, useDeleteJob } from '../../hooks/useJobs';
+import { useToast } from '../../hooks/useToast';
 import { StatusBadge } from '../ui/StatusBadge';
 import { Button } from '../ui/Button';
 import { ConfirmDialog } from '../ui/ConfirmDialog';
@@ -12,6 +13,7 @@ export function JobsTable() {
   const { data, isLoading } = useJobs();
   const runJob = useRunJob();
   const deleteJob = useDeleteJob();
+  const { toast } = useToast();
   const [jobToDelete, setJobToDelete] = useState<Job | null>(null);
 
   if (isLoading) {
@@ -38,13 +40,23 @@ export function JobsTable() {
   }
 
   const handleRun = (job: Job) => {
-    runJob.mutate(job.id);
+    runJob.mutate(job.id, {
+      onSuccess: () => toast.success('Job executed successfully'),
+      onError: (error: Error) => toast.error(error.message || 'Failed to run job')
+    });
   };
 
   const handleDelete = () => {
     if (jobToDelete) {
       deleteJob.mutate(jobToDelete.id, {
-        onSuccess: () => setJobToDelete(null)
+        onSuccess: () => {
+          toast.success('Job deleted successfully');
+          setJobToDelete(null);
+        },
+        onError: (error: Error) => {
+          toast.error(error.message || 'Failed to delete job');
+          setJobToDelete(null);
+        }
       });
     }
   };

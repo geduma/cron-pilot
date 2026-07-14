@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Input, Textarea, Select } from '../ui/Input';
 import { Button } from '../ui/Button';
 import { useCreateJob, useUpdateJob, useJob } from '../../hooks/useJobs';
+import { useToast } from '../../hooks/useToast';
 import { FREQUENCY_OPTIONS, HTTP_METHODS } from '../../utils/helpers';
 import { LoadingSpinner } from '../ui/LoadingSpinner';
 import type { HttpMethod, JobFrequency } from '../../types';
@@ -18,6 +19,7 @@ export function JobForm({ jobId }: JobFormProps) {
   const { data: existingJob, isLoading: isLoadingJob } = useJob(jobId || '');
   const createJob = useCreateJob();
   const updateJob = useUpdateJob();
+  const { toast } = useToast();
 
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
@@ -103,10 +105,26 @@ export function JobForm({ jobId }: JobFormProps) {
     if (isEditing && jobId) {
       updateJob.mutate(
         { id: jobId, job: jobData },
-        { onSuccess: () => navigate('/jobs') }
+        {
+          onSuccess: () => {
+            toast.success('Job updated successfully');
+            navigate('/jobs');
+          },
+          onError: (error: Error) => {
+            toast.error(error.message || 'Failed to update job');
+          }
+        }
       );
     } else {
-      createJob.mutate(jobData, { onSuccess: () => navigate('/jobs') });
+      createJob.mutate(jobData, {
+        onSuccess: () => {
+          toast.success('Job created successfully');
+          navigate('/jobs');
+        },
+        onError: (error: Error) => {
+          toast.error(error.message || 'Failed to create job');
+        }
+      });
     }
   };
 
