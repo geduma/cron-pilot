@@ -3,7 +3,7 @@ import type { GedumaSessionResponse } from '../types/index.js';
 
 const GEDUMA_API_URL = process.env.GEDUMA_API_URL || 'http://localhost:3000';
 
-const sessionCache = new Map<string, AuthUser>();
+export const sessionCache = new Map<string, AuthUser>();
 
 export interface AuthUser {
   email: string;

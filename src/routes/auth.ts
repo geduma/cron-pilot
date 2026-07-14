@@ -1,5 +1,6 @@
 import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import type { GedumaSessionResponse, ApiResponse, GedumaUser } from '../types/index.js';
+import { sessionCache, type AuthUser } from '../plugins/auth.js';
 
 const GEDUMA_API_URL = process.env.GEDUMA_API_URL || 'http://localhost:3000';
 
@@ -45,6 +46,15 @@ export default async function authRoutes(fastify: FastifyInstance): Promise<void
       }
 
       const userData: GedumaUser = data.data;
+
+      const authUser: AuthUser = {
+        email: userData.email,
+        displayName: userData.displayName,
+        picture: userData.picture,
+        provider: userData.provider,
+        userId: userData.email
+      };
+      sessionCache.set(sessionToken, authUser);
 
       const apiResponse: ApiResponse<GedumaUser> = {
         success: true,
