@@ -6,21 +6,47 @@ import { Button } from '../ui/Button';
 import { ConfirmDialog } from '../ui/ConfirmDialog';
 import { LoadingSpinner } from '../ui/LoadingSpinner';
 import { formatDate, getFrequencyLabel } from '../../utils/helpers';
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import type { Job } from '../../types';
 
-export function JobsTable() {
+const PAGE_SIZE = 10;
+
+interface JobsTableProps {
+  showActions?: boolean;
+}
+
+export function JobsTable({ showActions = true }: JobsTableProps) {
   const { data, isLoading } = useJobs();
   const runJob = useRunJob();
   const deleteJob = useDeleteJob();
   const { toast } = useToast();
   const [jobToDelete, setJobToDelete] = useState<Job | null>(null);
+  const [search, setSearch] = useState('');
+  const [page, setPage] = useState(0);
+
+  const jobs = data?.data || [];
+
+  const filtered = useMemo(() => {
+    if (!search.trim()) return jobs;
+    const q = search.toLowerCase();
+    return jobs.filter(
+      (j) =>
+        j.name.toLowerCase().includes(q) ||
+        j.url.toLowerCase().includes(q) ||
+        j.method.toLowerCase().includes(q)
+    );
+  }, [jobs, search]);
+
+  const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
+  const paged = filtered.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
+
+  if (search && page > 0 && page >= totalPages) {
+    setPage(0);
+  }
 
   if (isLoading) {
     return <LoadingSpinner />;
   }
-
-  const jobs = data?.data || [];
 
   if (jobs.length === 0) {
     return (
@@ -63,6 +89,16 @@ export function JobsTable() {
 
   return (
     <>
+      <div className="mb-4">
+        <input
+          type="text"
+          placeholder="Search by name, URL or method..."
+          value={search}
+          onChange={(e) => { setSearch(e.target.value); setPage(0); }}
+          className="w-full md:w-80 px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+        />
+      </div>
+
       <div className="bg-white shadow rounded-lg overflow-hidden">
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">
@@ -86,13 +122,15 @@ export function JobsTable() {
                 <th className="hidden lg:table-cell px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Next Execution
                 </th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Actions
-                </th>
+                {showActions && (
+                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Actions
+                  </th>
+                )}
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {jobs.map((job) => (
+              {paged.map((job) => (
                 <tr key={job.id} className="hover:bg-gray-50">
                   <td className="px-4 py-4 whitespace-nowrap">
                     <Link
@@ -118,44 +156,81 @@ export function JobsTable() {
                   <td className="hidden lg:table-cell px-4 py-4 whitespace-nowrap text-sm text-gray-500">
                     {formatDate(job.nextExecution)}
                   </td>
-                  <td className="px-4 py-4 whitespace-nowrap text-right text-sm font-medium space-x-2">
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => handleRun(job)}
-                      disabled={runJob.isPending}
-                    >
-                      Run
-                    </Button>
-                    <Link to={`/jobs/${job.id}/edit`}>
-                      <Button size="sm" variant="ghost">
-                        Edit
+                  {showActions && (
+                    <td className="px-4 py-4 whitespace-nowrap text-right text-sm font-medium space-x-2">
+                      <Button
+                        size="sm"
+                        variant="success"
+                        onClick={() => handleRun(job)}
+                        disabled={runJob.isPending}
+                      >
+                        Run
                       </Button>
-                    </Link>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => setJobToDelete(job)}
-                    >
-                      Delete
-                    </Button>
-                  </td>
+                      <Link to={`/jobs/${job.id}/edit`}>
+                        <Button size="sm" variant="secondary">
+                          Edit
+                        </Button>
+                      </Link>
+                      <Button
+                        size="sm"
+                        variant="danger"
+                        onClick={() => setJobToDelete(job)}
+                      >
+                        Delete
+                      </Button>
+                    </td>
+                  )}
                 </tr>
               ))}
+              {paged.length === 0 && (
+                <tr>
+                  <td colSpan={showActions ? 7 : 6} className="px-4 py-8 text-center text-sm text-gray-500">
+                    No jobs match your search
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
+
+        {totalPages > 1 && (
+          <div className="flex items-center justify-between px-4 py-3 border-t border-gray-200 bg-gray-50">
+            <span className="text-sm text-gray-500">
+              {filtered.length} job{filtered.length !== 1 ? 's' : ''} &middot; Page {page + 1} of {totalPages}
+            </span>
+            <div className="flex gap-2">
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={() => setPage((p) => Math.max(0, p - 1))}
+                disabled={page === 0}
+              >
+                Previous
+              </Button>
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
+                disabled={page >= totalPages - 1}
+              >
+                Next
+              </Button>
+            </div>
+          </div>
+        )}
       </div>
 
-      <ConfirmDialog
-        isOpen={!!jobToDelete}
-        title="Delete Job"
-        message={`Are you sure you want to delete "${jobToDelete?.name}"? This action cannot be undone.`}
-        confirmLabel="Delete"
-        onConfirm={handleDelete}
-        onCancel={() => setJobToDelete(null)}
-        isLoading={deleteJob.isPending}
-      />
+      {showActions && (
+        <ConfirmDialog
+          isOpen={!!jobToDelete}
+          title="Delete Job"
+          message={`Are you sure you want to delete "${jobToDelete?.name}"? This action cannot be undone.`}
+          confirmLabel="Delete"
+          onConfirm={handleDelete}
+          onCancel={() => setJobToDelete(null)}
+          isLoading={deleteJob.isPending}
+        />
+      )}
     </>
   );
 }

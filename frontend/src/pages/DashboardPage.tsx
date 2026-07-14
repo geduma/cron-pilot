@@ -25,7 +25,7 @@ export function DashboardPage() {
       </div>
 
       <StatsCards />
-      <JobsTable />
+      <JobsTable showActions={false} />
     </Layout>
   );
 }

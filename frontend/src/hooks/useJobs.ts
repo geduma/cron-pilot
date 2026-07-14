@@ -85,10 +85,34 @@ export function useRunJob() {
   });
 }
 
+export function useTestRunJob() {
+  return useMutation({
+    mutationFn: (job: {
+      method: HttpMethod;
+      url: string;
+      headers?: Record<string, string>;
+      body?: string;
+      expectedStatus: number;
+    }) => jobsApi.testRun(job)
+  });
+}
+
 export function useJobHistory(id: string, params?: { limit?: number; offset?: number; filter?: string }) {
   return useQuery({
     queryKey: ['jobs', id, 'history', params],
     queryFn: () => jobsApi.getHistory(id, params),
     enabled: !!id
+  });
+}
+
+export function useClearJobHistory() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (id: string) => jobsApi.clearHistory(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['jobs'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] });
+    }
   });
 }

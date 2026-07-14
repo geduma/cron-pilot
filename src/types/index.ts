@@ -6,31 +6,31 @@ export type ExecutionStatus = 'SUCCESS' | 'FAILED' | 'TIMEOUT';
 
 export interface Job {
   id: string;
-  user_id: string;
+  userId: string;
   name: string;
   description: string | null;
   method: HttpMethod;
   url: string;
   headers: Record<string, string>;
   body: string | null;
-  expected_status: number;
+  expectedStatus: number;
   frequency: JobFrequency;
   enabled: boolean;
-  last_execution: Date | null;
-  next_execution: Date | null;
-  created_at: Date;
-  updated_at: Date;
+  lastExecution: Date | null;
+  nextExecution: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
 }
 
 export interface JobExecution {
   id: string;
-  job_id: string;
+  jobId: string;
   status: ExecutionStatus;
-  http_status: number | null;
-  duration_ms: number | null;
-  response_body: string | null;
-  error_message: string | null;
-  executed_at: Date;
+  httpStatus: number | null;
+  durationMs: number | null;
+  responseBody: string | null;
+  errorMessage: string | null;
+  executedAt: Date;
 }
 
 export interface DashboardStats {

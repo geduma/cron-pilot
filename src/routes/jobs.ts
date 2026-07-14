@@ -37,6 +37,85 @@ export default async function jobsRoutes(fastify: FastifyInstance): Promise<void
     return reply.send(response);
   });
 
+  // POST /api/jobs/test - Test run without saving
+  fastify.post('/api/jobs/test', async (request: FastifyRequest, reply: FastifyReply) => {
+    const body = request.body as CreateJobRequest;
+
+    if (!body.url || !body.method) {
+      return reply.status(400).send({
+        success: false,
+        message: 'url and method are required'
+      });
+    }
+
+    if (body.expectedStatus && (body.expectedStatus < 100 || body.expectedStatus > 599)) {
+      return reply.status(400).send({
+        success: false,
+        message: 'expectedStatus must be between 100 and 599'
+      });
+    }
+
+    const startTime = Date.now();
+    let httpStatus = 0;
+    let responseBody = '';
+    let errorMessage = '';
+    let status: 'SUCCESS' | 'FAILED' | 'TIMEOUT' = 'SUCCESS';
+
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 30000);
+
+      const headers: Record<string, string> = body.headers || {};
+
+      const fetchOptions: RequestInit = {
+        method: body.method,
+        headers,
+        signal: controller.signal
+      };
+
+      if (['POST', 'PUT', 'PATCH'].includes(body.method) && body.body) {
+        fetchOptions.body = body.body;
+      }
+
+      const response = await fetch(body.url, fetchOptions);
+      clearTimeout(timeoutId);
+
+      httpStatus = response.status;
+      responseBody = await response.text();
+
+      const expected = body.expectedStatus || 200;
+      if (httpStatus !== expected) {
+        status = 'FAILED';
+        errorMessage = `Expected status ${expected}, got ${httpStatus}`;
+      }
+    } catch (error) {
+      const err = error as Error;
+      if (err.name === 'AbortError') {
+        status = 'TIMEOUT';
+        errorMessage = 'Request timed out after 30 seconds';
+      } else {
+        status = 'FAILED';
+        errorMessage = err.message || 'Unknown error';
+      }
+    }
+
+    const durationMs = Date.now() - startTime;
+
+    const response = {
+      success: true,
+      data: {
+        status,
+        httpStatus,
+        durationMs,
+        responseBody: responseBody.substring(0, 1000),
+        error: errorMessage || undefined
+      },
+      message: status === 'SUCCESS' ? 'Test passed' : 'Test failed'
+    };
+
+    return reply.send(response);
+  });
+
   // POST /api/jobs - Create new job
   fastify.post('/api/jobs', async (request: FastifyRequest, reply: FastifyReply) => {
     const userId = request.user.userId;
@@ -57,7 +136,7 @@ export default async function jobsRoutes(fastify: FastifyInstance): Promise<void
       });
     }
 
-    const nextExecution = calculateNextExecution(body.frequency);
+    const nextExecution = calculateNextExecution(body.frequency).toISOString();
     const id = crypto.randomUUID();
 
     const stmt = fastify.db.prepare(
@@ -174,7 +253,7 @@ export default async function jobsRoutes(fastify: FastifyInstance): Promise<void
       updates.push('frequency = ?');
       values.push(body.frequency);
       // Recalculate next execution if frequency changed
-      const nextExecution = calculateNextExecution(body.frequency, new Date());
+      const nextExecution = calculateNextExecution(body.frequency, new Date()).toISOString();
       updates.push('next_execution = ?');
       values.push(nextExecution);
     }
@@ -288,9 +367,9 @@ export default async function jobsRoutes(fastify: FastifyInstance): Promise<void
       httpStatus = response.status;
       responseBody = await response.text();
 
-      if (httpStatus !== job.expected_status) {
+      if (httpStatus !== job.expectedStatus) {
         status = 'FAILED';
-        errorMessage = `Expected status ${job.expected_status}, got ${httpStatus}`;
+        errorMessage = `Expected status ${job.expectedStatus}, got ${httpStatus}`;
       }
     } catch (error) {
       const err = error as Error;
@@ -381,6 +460,35 @@ export default async function jobsRoutes(fastify: FastifyInstance): Promise<void
       success: true,
       data: executions,
       message: ''
+    };
+
+    return reply.send(response);
+  });
+
+  // DELETE /api/jobs/:id/history - Clear job execution history
+  fastify.delete<{ Params: JobParams }>('/api/jobs/:id/history', async (request, reply) => {
+    const userId = request.user.userId;
+    const { id } = request.params;
+
+    const jobCheck = fastify.db.prepare(
+      'SELECT id FROM jobs WHERE id = ? AND user_id = ?'
+    ).get(id, userId);
+
+    if (!jobCheck) {
+      return reply.status(404).send({
+        success: false,
+        message: 'Job not found'
+      });
+    }
+
+    const result = fastify.db.prepare(
+      'DELETE FROM job_executions WHERE job_id = ?'
+    ).run(id);
+
+    const response: ApiResponse<null> = {
+      success: true,
+      data: null,
+      message: `Cleared ${result.changes} execution(s)`
     };
 
     return reply.send(response);

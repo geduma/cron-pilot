@@ -104,9 +104,9 @@ export class Scheduler {
       httpStatus = response.status;
       responseBody = await response.text();
 
-      if (httpStatus !== job.expected_status) {
+      if (httpStatus !== job.expectedStatus) {
         status = 'FAILED';
-        errorMessage = `Expected status ${job.expected_status}, got ${httpStatus}`;
+        errorMessage = `Expected status ${job.expectedStatus}, got ${httpStatus}`;
       }
 
       console.log(`Job ${job.name} completed with status ${status} (${httpStatus})`);
@@ -132,7 +132,7 @@ export class Scheduler {
     ).run(executionId, job.id, status, httpStatus, durationMs, responseBody || null, errorMessage || null);
 
     // Update job
-    const nextExecution = calculateNextExecution(job.frequency, new Date());
+    const nextExecution = calculateNextExecution(job.frequency, new Date()).toISOString();
     this.db.prepare(
       `UPDATE jobs
        SET last_execution = datetime('now'),

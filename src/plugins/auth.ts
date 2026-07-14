@@ -1,8 +1,6 @@
 import type { FastifyRequest, FastifyReply } from 'fastify';
 import type { GedumaSessionResponse } from '../types/index.js';
 
-const GEDUMA_API_URL = process.env.GEDUMA_API_URL || 'http://localhost:3000';
-
 export const sessionCache = new Map<string, AuthUser>();
 
 export interface AuthUser {
@@ -37,8 +35,10 @@ export async function authMiddleware(request: FastifyRequest, reply: FastifyRepl
     return;
   }
 
+  const gedumaUrl = process.env.GEDUMA_API_URL || 'http://localhost:3000';
+
   try {
-    const response = await fetch(`${GEDUMA_API_URL}/auth/session/${token}`);
+    const response = await fetch(`${gedumaUrl}/auth/session/${token}`);
 
     if (!response.ok) {
       sessionCache.delete(token);

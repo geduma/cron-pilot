@@ -30,7 +30,7 @@ cron-pilot/
 │   │   └── utils/         # Helpers
 │   └── .env
 ├── src/                   # Fastify API
-│   ├── routes/            # API endpoints (jobs.ts, dashboard.ts)
+│   ├── routes/            # API endpoints (jobs.ts, dashboard.ts, auth.ts)
 │   ├── services/          # Business logic (scheduler.ts)
 │   ├── plugins/           # Fastify plugins (auth.ts, db.ts)
 │   ├── types/             # TypeScript types
@@ -38,10 +38,14 @@ cron-pilot/
 ├── data/                  # SQLite database (gitignored)
 ├── docs/                  # Documentation
 │   ├── specification-v1.0.md
-│   ├── cron-pilot-api-spec.md
 │   ├── implementation-plan.md
 │   ├── PRD.md
 │   └── AGENTS.md
+├── .env                   # Local environment variables
+├── .env.docker            # Docker environment variables
+├── .env.example           # Environment template
+├── Dockerfile             # Multi-stage Docker build
+├── docker-compose.yml     # Docker Compose config
 ├── package.json
 └── tsconfig.json
 ```
@@ -69,7 +73,24 @@ npm run migrate            # Run SQLite migrations
 
 # Production
 npm run start              # Start compiled backend
+
+# Docker
+docker compose up -d --build   # Build and run in Docker
+docker compose down            # Stop containers
+docker compose logs -f         # View logs
 ```
+
+---
+
+## Environment Variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `PORT` | `3000` | Backend port |
+| `HOST` | `0.0.0.0` | Bind address |
+| `NODE_ENV` | `development` | Environment mode |
+| `DATABASE_PATH` | `./data/cronpilot.db` | SQLite file path |
+| `GEDUMA_API_URL` | `https://api.geduma.com` | Geduma Auth API URL |
 
 ---
 
@@ -94,18 +115,46 @@ npm run start              # Start compiled backend
 - Auth middleware validates Geduma session tokens
 - All API responses follow `{ success, data, message }` format
 - Scheduler runs in-process (no separate workers)
+- `mapRowToCamel` converts snake_case DB columns to camelCase for JS objects
 
 ---
 
 ## Auth Flow
 
-1. Frontend fetches GitHub provider from Geduma Auth
-2. User clicks login → redirected to GitHub OAuth
-3. GitHub callback → Geduma Auth redirects to `/auth/callback#session_token=xxx`
-4. Frontend exchanges session token for user data
-5. Backend validates session token on every API request
+1. Frontend redirects to Geduma Auth (`/api/auth/session`)
+2. Backend validates session token against Geduma API
+3. User data cached in memory (`sessionCache` Map)
+4. Backend returns user data to frontend
+5. Token stored in `localStorage`, sent as `Authorization: Bearer <token>` on every request
 
 **App ID:** `app_mrjlwiq7sdny2i`
+
+---
+
+## API Endpoints
+
+### Authentication
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/api/auth/session` | Validate session token, return user data |
+
+### Jobs
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/jobs` | List all jobs |
+| POST | `/api/jobs` | Create job |
+| GET | `/api/jobs/:id` | Get job by ID |
+| PUT | `/api/jobs/:id` | Update job |
+| DELETE | `/api/jobs/:id` | Delete job (cascades to executions) |
+| POST | `/api/jobs/:id/run` | Execute job manually |
+| POST | `/api/jobs/test` | Test run without saving |
+| GET | `/api/jobs/:id/history` | Get execution history |
+| DELETE | `/api/jobs/:id/history` | Clear execution history |
+
+### Dashboard
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/dashboard/stats` | Get dashboard statistics |
 
 ---
 
@@ -139,9 +188,13 @@ Error:
 - `enabled` - Toggle job on/off (INTEGER: 1 or 0)
 
 **Notes:**
-- Dates stored as TEXT (ISO 8601)
+- Dates stored as TEXT (`datetime('now')` = UTC)
 - Booleans stored as INTEGER (0 or 1)
 - Headers stored as JSON string
+- `ON DELETE CASCADE` — deleting a job removes its executions
+- `mapRowToCamel` converts snake_case DB columns to camelCase
+
+**Critical:** SQLite `datetime('now')` stores UTC. Frontend must append `Z` when parsing with `new Date()` to display correct local time.
 
 ---
 
@@ -155,12 +208,49 @@ Error:
 
 ---
 
+## Frontend Features
+
+### JobsTable
+- Search filter (name, URL, method)
+- Client-side pagination (10 per page)
+- `showActions` prop — `false` for dashboard, `true` for jobs page
+- Color-coded action buttons: Run (green), Edit (gray), Delete (red)
+
+### HistoryTable
+- Filter buttons: All, 24h, 7d, 30d
+- Expandable rows — click to view response body
+- Pagination
+
+### JobForm
+- Toggle switch for active/paused status
+- Test Run button (executes without saving)
+- Toast notifications on success/error
+
+### Toast System
+- `ToastProvider` wraps app in `App.tsx`
+- `useToast()` hook — `toast.success()`, `toast.error()`
+- Auto-dismiss after 3 seconds
+
+---
+
 ## Deployment
 
-Single server:
-- Backend serves frontend static files from `frontend/dist/` via @fastify/static
-- Backend runs as systemd service or PM2
-- SQLite database file persists in `data/` directory
+### Docker (Recommended)
+```bash
+docker compose up -d --build
+```
+- Maps port `3001:3000`
+- Uses `.env.docker` config
+- Volume persists SQLite data
+- Backend serves frontend static files
+
+### Manual
+```bash
+npm run build
+npm run start
+```
+
+No nginx needed — backend serves everything via `@fastify/static`.
 
 ---
 

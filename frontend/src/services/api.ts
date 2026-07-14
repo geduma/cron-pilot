@@ -68,8 +68,18 @@ export const jobsApi = {
     return data;
   },
 
+  testRun: async (job: Partial<Job>): Promise<ApiResponse<{ status: string; httpStatus: number; durationMs: number; responseBody: string; error?: string }>> => {
+    const { data } = await api.post('/api/jobs/test', job);
+    return data;
+  },
+
   getHistory: async (id: string, params?: { limit?: number; offset?: number; filter?: string }): Promise<ApiResponse<JobExecution[]>> => {
     const { data } = await api.get(`/api/jobs/${id}/history`, { params });
+    return data;
+  },
+
+  clearHistory: async (id: string): Promise<ApiResponse<null>> => {
+    const { data } = await api.delete(`/api/jobs/${id}/history`);
     return data;
   }
 };

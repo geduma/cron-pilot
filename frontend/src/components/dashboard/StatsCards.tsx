@@ -59,7 +59,7 @@ export function StatsCards() {
 
       <StatsCard
         title="Last Execution"
-        value={stats?.lastExecution ? new Date(stats.lastExecution).toLocaleTimeString() : '-'}
+        value={stats?.lastExecution ? new Date(stats.lastExecution.endsWith('Z') ? stats.lastExecution : stats.lastExecution + 'Z').toLocaleTimeString() : '-'}
         color="gray"
         icon={
           <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor">
@@ -70,7 +70,7 @@ export function StatsCards() {
 
       <StatsCard
         title="Next Execution"
-        value={stats?.nextExecution ? new Date(stats.nextExecution).toLocaleTimeString() : '-'}
+        value={stats?.nextExecution ? new Date(stats.nextExecution.endsWith('Z') ? stats.nextExecution : stats.nextExecution + 'Z').toLocaleTimeString() : '-'}
         color="gray"
         icon={
           <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor">
