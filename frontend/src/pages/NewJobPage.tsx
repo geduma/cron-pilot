@@ -4,7 +4,9 @@ import { JobForm } from '../components/jobs/JobForm';
 export function NewJobPage() {
   return (
     <Layout>
-      <JobForm />
+      <div className="mb-8">
+        <JobForm />
+      </div>
     </Layout>
   );
 }

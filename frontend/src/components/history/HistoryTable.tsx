@@ -12,6 +12,7 @@ interface HistoryTableProps {
 export function HistoryTable({ jobId }: HistoryTableProps) {
   const [filter, setFilter] = useState<string | undefined>(undefined);
   const [page, setPage] = useState(0);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
   const limit = 20;
 
   const { data, isLoading } = useJobHistory(jobId, {
@@ -25,6 +26,10 @@ export function HistoryTable({ jobId }: HistoryTableProps) {
   }
 
   const executions = data?.data || [];
+
+  const toggleRow = (id: string) => {
+    setExpandedId(expandedId === id ? null : id);
+  };
 
   return (
     <div>
@@ -69,6 +74,7 @@ export function HistoryTable({ jobId }: HistoryTableProps) {
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
+                  <th className="w-8 px-4 py-3" />
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Date
                   </th>
@@ -87,25 +93,61 @@ export function HistoryTable({ jobId }: HistoryTableProps) {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {executions.map((execution) => (
-                  <tr key={execution.id} className="hover:bg-gray-50">
-                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {formatDate(execution.executedAt)}
-                    </td>
-                    <td className="px-4 py-4 whitespace-nowrap">
-                      <StatusBadge status={execution.status} size="sm" />
-                    </td>
-                    <td className="hidden sm:table-cell px-4 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {execution.httpStatus || '-'}
-                    </td>
-                    <td className="hidden md:table-cell px-4 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {formatDuration(execution.durationMs)}
-                    </td>
-                    <td className="hidden lg:table-cell px-4 py-4 text-sm text-red-600 max-w-xs truncate">
-                      {execution.errorMessage || '-'}
-                    </td>
-                  </tr>
-                ))}
+                {executions.map((execution) => {
+                  const isExpanded = expandedId === execution.id;
+                  const hasBody = !!execution.responseBody;
+
+                  return (
+                    <>
+                      <tr
+                        key={execution.id}
+                        className={`hover:bg-gray-50 ${hasBody ? 'cursor-pointer' : ''}`}
+                        onClick={() => hasBody && toggleRow(execution.id)}
+                      >
+                        <td className="px-4 py-4 whitespace-nowrap text-center">
+                          {hasBody && (
+                            <svg
+                              className={`h-4 w-4 text-gray-400 transition-transform ${isExpanded ? 'rotate-90' : ''}`}
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              strokeWidth="2"
+                              stroke="currentColor"
+                            >
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
+                            </svg>
+                          )}
+                        </td>
+                        <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
+                          {formatDate(execution.executedAt)}
+                        </td>
+                        <td className="px-4 py-4 whitespace-nowrap">
+                          <StatusBadge status={execution.status} size="sm" />
+                        </td>
+                        <td className="hidden sm:table-cell px-4 py-4 whitespace-nowrap text-sm text-gray-500">
+                          {execution.httpStatus || '-'}
+                        </td>
+                        <td className="hidden md:table-cell px-4 py-4 whitespace-nowrap text-sm text-gray-500">
+                          {formatDuration(execution.durationMs)}
+                        </td>
+                        <td className="hidden lg:table-cell px-4 py-4 text-sm text-red-600 max-w-xs truncate">
+                          {execution.errorMessage || '-'}
+                        </td>
+                      </tr>
+                      {isExpanded && hasBody && (
+                        <tr key={`${execution.id}-expanded`}>
+                          <td colSpan={6} className="px-4 py-4 bg-gray-50">
+                            <div className="text-xs font-medium text-gray-500 uppercase mb-2">
+                              Response Body
+                            </div>
+                            <pre className="text-sm text-gray-900 bg-white border border-gray-200 rounded-lg p-3 overflow-x-auto max-h-64 overflow-y-auto whitespace-pre-wrap break-all">
+                              {execution.responseBody}
+                            </pre>
+                          </td>
+                        </tr>
+                      )}
+                    </>
+                  );
+                })}
               </tbody>
             </table>
           </div>

@@ -2,7 +2,8 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Input, Textarea, Select } from '../ui/Input';
 import { Button } from '../ui/Button';
-import { useCreateJob, useUpdateJob, useJob } from '../../hooks/useJobs';
+import { useCreateJob, useUpdateJob, useJob, useTestRunJob } from '../../hooks/useJobs';
+import { useToast } from '../../hooks/useToast';
 import { FREQUENCY_OPTIONS, HTTP_METHODS } from '../../utils/helpers';
 import { LoadingSpinner } from '../ui/LoadingSpinner';
 import type { HttpMethod, JobFrequency } from '../../types';
@@ -18,6 +19,8 @@ export function JobForm({ jobId }: JobFormProps) {
   const { data: existingJob, isLoading: isLoadingJob } = useJob(jobId || '');
   const createJob = useCreateJob();
   const updateJob = useUpdateJob();
+  const testRun = useTestRunJob();
+  const { toast } = useToast();
 
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
@@ -37,7 +40,7 @@ export function JobForm({ jobId }: JobFormProps) {
       setDescription(job.description || '');
       setMethod(job.method);
       setUrl(job.url);
-      setHeaders(JSON.stringify(job.headers, null, 2));
+      setHeaders(typeof job.headers === 'string' ? job.headers : JSON.stringify(job.headers, null, 2));
       setBody(job.body || '');
       setExpectedStatus(String(job.expectedStatus));
       setFrequency(job.frequency);
@@ -103,11 +106,64 @@ export function JobForm({ jobId }: JobFormProps) {
     if (isEditing && jobId) {
       updateJob.mutate(
         { id: jobId, job: jobData },
-        { onSuccess: () => navigate('/jobs') }
+        {
+          onSuccess: () => {
+            toast.success('Job updated successfully');
+            navigate('/jobs');
+          },
+          onError: (error: Error) => {
+            toast.error(error.message || 'Failed to update job');
+          }
+        }
       );
     } else {
-      createJob.mutate(jobData, { onSuccess: () => navigate('/jobs') });
+      createJob.mutate(jobData, {
+        onSuccess: () => {
+          toast.success('Job created successfully');
+          navigate('/jobs');
+        },
+        onError: (error: Error) => {
+          toast.error(error.message || 'Failed to create job');
+        }
+      });
     }
+  };
+
+  const handleTestRun = () => {
+    if (!url.trim()) {
+      toast.error('Enter a URL before testing');
+      return;
+    }
+    if (headers) {
+      try {
+        JSON.parse(headers);
+      } catch {
+        toast.error('Fix headers JSON before testing');
+        return;
+      }
+    }
+    testRun.mutate(
+      {
+        method,
+        url: url.trim(),
+        headers: headers ? JSON.parse(headers) : {},
+        body: body.trim() || undefined,
+        expectedStatus: parseInt(expectedStatus) || 200
+      },
+      {
+        onSuccess: (response) => {
+          const result = response.data;
+          if (result.status === 'SUCCESS') {
+            toast.success(`OK ${result.httpStatus} - ${result.durationMs}ms`);
+          } else {
+            toast.error(`${result.status}: ${result.error || result.httpStatus}`);
+          }
+        },
+        onError: () => {
+          toast.error('Failed to execute test run');
+        }
+      }
+    );
   };
 
   if (isEditing && isLoadingJob) {
@@ -130,34 +186,25 @@ export function JobForm({ jobId }: JobFormProps) {
             placeholder="My Health Check"
           />
 
-          <div className="mb-4">
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Status
-            </label>
-            <div className="flex items-center space-x-3">
-              <button
-                type="button"
-                onClick={() => setEnabled(true)}
-                className={`px-4 py-2 rounded-lg text-sm font-medium ${
-                  enabled
-                    ? 'bg-green-100 text-green-800 border border-green-300'
-                    : 'bg-gray-100 text-gray-600 border border-gray-200'
+          <div className="mb-4 flex items-center gap-3">
+            <button
+              type="button"
+              role="switch"
+              aria-checked={enabled}
+              onClick={() => setEnabled(!enabled)}
+              className={`relative inline-flex h-7 w-12 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${
+                enabled ? 'bg-green-500' : 'bg-gray-300'
+              }`}
+            >
+              <span
+                className={`pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out ${
+                  enabled ? 'translate-x-5' : 'translate-x-0'
                 }`}
-              >
-                Active
-              </button>
-              <button
-                type="button"
-                onClick={() => setEnabled(false)}
-                className={`px-4 py-2 rounded-lg text-sm font-medium ${
-                  !enabled
-                    ? 'bg-yellow-100 text-yellow-800 border border-yellow-300'
-                    : 'bg-gray-100 text-gray-600 border border-gray-200'
-                }`}
-              >
-                Paused
-              </button>
-            </div>
+              />
+            </button>
+            <span className="text-sm text-gray-600">
+              {enabled ? 'Active' : 'Paused'}
+            </span>
           </div>
         </div>
 
@@ -230,20 +277,30 @@ export function JobForm({ jobId }: JobFormProps) {
         )}
       </div>
 
-      <div className="flex justify-end space-x-3">
+      <div className="flex justify-between">
         <Button
           type="button"
-          variant="secondary"
-          onClick={() => navigate('/jobs')}
+          variant="success"
+          onClick={handleTestRun}
+          isLoading={testRun.isPending}
         >
-          Cancel
+          Test Run
         </Button>
-        <Button
-          type="submit"
-          isLoading={createJob.isPending || updateJob.isPending}
-        >
-          {isEditing ? 'Update Job' : 'Create Job'}
-        </Button>
+        <div className="flex space-x-3">
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={() => navigate('/jobs')}
+          >
+            Cancel
+          </Button>
+          <Button
+            type="submit"
+            isLoading={createJob.isPending || updateJob.isPending}
+          >
+            {isEditing ? 'Update Job' : 'Create Job'}
+          </Button>
+        </div>
       </div>
     </form>
   );

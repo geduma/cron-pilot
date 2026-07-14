@@ -62,7 +62,11 @@ No forma parte del MVP:
 
 ## Base de datos
 
-Supabase PostgreSQL
+SQLite (via better-sqlite3)
+
+File: `./data/cronpilot.db`
+
+Zero config, file-based, self-contained.
 
 ---
 

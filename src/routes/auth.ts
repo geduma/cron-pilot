@@ -2,10 +2,9 @@ import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import type { GedumaSessionResponse, ApiResponse, GedumaUser } from '../types/index.js';
 import { sessionCache, type AuthUser } from '../plugins/auth.js';
 
-const GEDUMA_API_URL = process.env.GEDUMA_API_URL || 'http://localhost:3000';
-
 export default async function authRoutes(fastify: FastifyInstance): Promise<void> {
   fastify.post('/api/auth/session', async (request: FastifyRequest, reply: FastifyReply) => {
+    const gedumaUrl = process.env.GEDUMA_API_URL || 'http://localhost:3000';
     const { sessionToken } = request.body as { sessionToken: string };
 
     if (!sessionToken) {
@@ -17,7 +16,7 @@ export default async function authRoutes(fastify: FastifyInstance): Promise<void
     }
 
     try {
-      const response = await fetch(`${GEDUMA_API_URL}/auth/session/${sessionToken}`);
+      const response = await fetch(`${gedumaUrl}/auth/session/${sessionToken}`);
 
       if (!response.ok) {
         return reply.status(401).send({
@@ -65,10 +64,11 @@ export default async function authRoutes(fastify: FastifyInstance): Promise<void
       return reply.send(apiResponse);
     } catch (error) {
       console.error('Session validation error:', error);
+      const detail = error instanceof Error ? error.message : String(error);
       return reply.status(500).send({
         success: false,
         data: null,
-        message: 'Internal server error during session validation'
+        message: `Internal server error during session validation: ${detail}`
       } as ApiResponse<null>);
     }
   });

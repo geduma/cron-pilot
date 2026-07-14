@@ -16,7 +16,7 @@ export const HTTP_METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'] as const;
 
 export function formatDate(dateString: string | null): string {
   if (!dateString) return '-';
-  const date = new Date(dateString);
+  const date = new Date(dateString.endsWith('Z') ? dateString : dateString + 'Z');
   return date.toLocaleDateString('en-US', {
     year: 'numeric',
     month: 'short',

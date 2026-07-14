@@ -44,6 +44,16 @@ npm run start
 
 The backend serves both the API and the frontend static files.
 
+## Docker
+
+```bash
+docker compose up -d --build
+```
+
+- Runs on port `3001` (mapped to container port `3000`)
+- SQLite data persisted via Docker volume
+- Config via `.env.docker`
+
 ## Project Structure
 
 ```
@@ -61,7 +71,12 @@ cron-pilot/
 │   ├── plugins/
 │   └── types/
 ├── data/              # SQLite database (gitignored)
-└── docs/
+├── docs/
+├── Dockerfile
+├── docker-compose.yml
+├── .env
+├── .env.docker
+└── .env.example
 ```
 
 ## Database
@@ -69,3 +84,5 @@ cron-pilot/
 SQLite file at `./data/cronpilot.db`. Auto-created on first run.
 
 Tables: `jobs`, `job_executions`.
+
+Cascade delete: deleting a job removes its execution history.
