@@ -7,6 +7,7 @@ import { fileURLToPath } from 'url';
 import { initDatabase, closeDatabase } from './plugins/db.js';
 import jobsRoutes from './routes/jobs.js';
 import dashboardRoutes from './routes/dashboard.js';
+import authRoutes from './routes/auth.js';
 import { Scheduler } from './services/scheduler.js';
 
 // Load environment variables
@@ -37,6 +38,7 @@ await fastify.register(fastifyStatic, {
 });
 
 // API routes
+await fastify.register(authRoutes);
 await fastify.register(jobsRoutes);
 await fastify.register(dashboardRoutes);
 

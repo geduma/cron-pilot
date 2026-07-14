@@ -42,7 +42,6 @@ cron-pilot/
 │   ├── implementation-plan.md
 │   ├── PRD.md
 │   └── AGENTS.md
-├── nginx.conf
 ├── package.json
 └── tsconfig.json
 ```
@@ -158,10 +157,9 @@ Error:
 
 ## Deployment
 
-Single server with Nginx:
-- Nginx serves frontend static files from `frontend/dist/`
-- Nginx proxies `/api/*` to Node.js backend (port 3000)
-- Backend serves as systemd service or PM2
+Single server:
+- Backend serves frontend static files from `frontend/dist/` via @fastify/static
+- Backend runs as systemd service or PM2
 - SQLite database file persists in `data/` directory
 
 ---

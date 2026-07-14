@@ -2,6 +2,7 @@ import type { ProvidersResponse, LoginResponse, SessionResponse, Provider } from
 
 const GEDUMA_API_URL = import.meta.env.VITE_GEDUMA_API_URL;
 const APP_ID = import.meta.env.VITE_GEDUMA_APP_ID;
+const API_URL = import.meta.env.VITE_API_URL;
 
 export const authApi = {
   getProviders: async (): Promise<Provider[]> => {
@@ -34,9 +35,16 @@ export const authApi = {
 
   getSession: async (sessionToken: string): Promise<SessionResponse | null> => {
     try {
-      const response = await fetch(`${GEDUMA_API_URL}/auth/session/${sessionToken}`);
-      const data: SessionResponse = await response.json();
-      return data;
+      const response = await fetch(`${API_URL}/api/auth/session`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sessionToken })
+      });
+      const data = await response.json();
+      if (data.success && data.data) {
+        return { ok: true, msg: '', data: data.data };
+      }
+      return { ok: false, msg: data.message || 'Session validation failed', data: null };
     } catch {
       return null;
     }
