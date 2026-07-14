@@ -44,7 +44,7 @@ export const authApi = {
       if (data.success && data.data) {
         return { ok: true, msg: '', data: data.data };
       }
-      return { ok: false, msg: data.message || 'Session validation failed', data: null };
+      return null;
     } catch {
       return null;
     }
