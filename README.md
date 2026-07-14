@@ -42,7 +42,7 @@ npm run build
 npm run start
 ```
 
-Requires Nginx in front to serve `frontend/dist/` and proxy `/api/*` to the Node.js backend (see `nginx.conf`).
+The backend serves both the API and the frontend static files.
 
 ## Project Structure
 
