@@ -3,6 +3,8 @@ import type { GedumaSessionResponse } from '../types/index.js';
 
 const GEDUMA_API_URL = process.env.GEDUMA_API_URL || 'http://localhost:3000';
 
+const sessionCache = new Map<string, AuthUser>();
+
 export interface AuthUser {
   email: string;
   displayName: string;
@@ -29,10 +31,17 @@ export async function authMiddleware(request: FastifyRequest, reply: FastifyRepl
 
   const token = authHeader.substring(7);
 
+  const cached = sessionCache.get(token);
+  if (cached) {
+    request.user = cached;
+    return;
+  }
+
   try {
     const response = await fetch(`${GEDUMA_API_URL}/auth/session/${token}`);
 
     if (!response.ok) {
+      sessionCache.delete(token);
       return reply.status(401).send({
         success: false,
         message: 'Unauthorized: Invalid or expired token'
@@ -63,6 +72,8 @@ export async function authMiddleware(request: FastifyRequest, reply: FastifyRepl
       provider: data.data.provider,
       userId: data.data.email
     };
+
+    sessionCache.set(token, request.user);
   } catch (error) {
     console.error('Auth validation error:', error);
     return reply.status(500).send({
