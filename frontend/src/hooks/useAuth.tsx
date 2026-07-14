@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useState, useEffect, type ReactNode } from 'react';
 import type { User } from '../types';
 import { authApi } from '../services/auth';
 
@@ -44,7 +44,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     authApi.logout();
   };
 
-  const handleCallback = async (sessionToken: string): Promise<boolean> => {
+  const handleCallback = useCallback(async (sessionToken: string): Promise<boolean> => {
     const response = await authApi.getSession(sessionToken);
 
     if (response?.ok && response.data) {
@@ -56,7 +56,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     return false;
-  };
+  }, []);
 
   return (
     <AuthContext.Provider
