@@ -1,6 +1,6 @@
 import type Database from 'better-sqlite3';
 import type { Job } from '../types/index.js';
-import { calculateNextExecution } from '../utils/helpers.js';
+import { calculateNextExecution, generateUUID } from '../utils/helpers.js';
 
 export class Scheduler {
   private intervalId: NodeJS.Timeout | null = null;
@@ -123,7 +123,7 @@ export class Scheduler {
     }
 
     const durationMs = Date.now() - startTime;
-    const executionId = crypto.randomUUID();
+    const executionId = generateUUID();
 
     // Save execution
     this.db.prepare(
