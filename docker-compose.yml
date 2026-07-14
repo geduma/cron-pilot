@@ -1,0 +1,14 @@
+services:
+  cronpilot:
+    build: .
+    container_name: cronpilot
+    restart: unless-stopped
+    ports:
+      - "3001:3000"
+    env_file:
+      - .env.docker
+    volumes:
+      - cronpilot-data:/app/data
+
+volumes:
+  cronpilot-data:
