@@ -288,9 +288,9 @@ export default async function jobsRoutes(fastify: FastifyInstance): Promise<void
       httpStatus = response.status;
       responseBody = await response.text();
 
-      if (httpStatus !== job.expectedStatus) {
+      if (httpStatus !== job.expected_status) {
         status = 'FAILED';
-        errorMessage = `Expected status ${job.expectedStatus}, got ${httpStatus}`;
+        errorMessage = `Expected status ${job.expected_status}, got ${httpStatus}`;
       }
     } catch (error) {
       const err = error as Error;

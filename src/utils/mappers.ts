@@ -11,5 +11,5 @@ export function mapRowToCamel<T = Record<string, unknown>>(row: Record<string, u
 }
 
 export function mapRowsToCamel<T = Record<string, unknown>>(rows: Record<string, unknown>[]): T[] {
-  return rows.map(mapRowToCamel);
+  return rows.map((row) => mapRowToCamel<T>(row));
 }
