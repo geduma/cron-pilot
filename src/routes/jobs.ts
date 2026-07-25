@@ -14,18 +14,35 @@ interface HistoryQuery {
   filter?: string;
 }
 
+interface JobsQuery {
+  filter?: string;
+}
+
 export default async function jobsRoutes(fastify: FastifyInstance): Promise<void> {
   // Apply auth middleware to all routes
   fastify.addHook('onRequest', authMiddleware);
 
   // GET /api/jobs - List all jobs for user
-  fastify.get('/api/jobs', async (request: FastifyRequest, reply: FastifyReply) => {
+  fastify.get<{ Querystring: JobsQuery }>('/api/jobs', async (request, reply) => {
     const userId = request.user.userId;
+    const { filter } = request.query;
 
-    const stmt = fastify.db.prepare(
-      'SELECT * FROM jobs WHERE user_id = ? ORDER BY created_at DESC'
-    );
-    const rows = stmt.all(userId);
+    let rows;
+    if (filter === 'failed') {
+      rows = fastify.db.prepare(
+        `SELECT DISTINCT j.* FROM jobs j
+         INNER JOIN job_executions je ON je.job_id = j.id
+         WHERE j.user_id = ?
+         AND je.status IN ('FAILED', 'TIMEOUT')
+         AND je.executed_at >= datetime('now', '-24 hours')
+         ORDER BY j.created_at DESC`
+      ).all(userId);
+    } else {
+      rows = fastify.db.prepare(
+        'SELECT * FROM jobs WHERE user_id = ? ORDER BY created_at DESC'
+      ).all(userId);
+    }
+
     const jobs = mapRowsToCamel<Job>(rows as Record<string, unknown>[]);
 
     const response: ApiResponse<Job[]> = {
