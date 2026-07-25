@@ -10,10 +10,10 @@ export function useDashboardStats() {
   });
 }
 
-export function useJobs() {
+export function useJobs(filter?: string) {
   return useQuery({
-    queryKey: ['jobs'],
-    queryFn: () => jobsApi.getAll(),
+    queryKey: ['jobs', filter],
+    queryFn: () => jobsApi.getAll(filter),
     refetchInterval: 10000
   });
 }

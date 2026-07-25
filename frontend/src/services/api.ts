@@ -38,8 +38,9 @@ export const dashboardApi = {
 };
 
 export const jobsApi = {
-  getAll: async (): Promise<ApiResponse<Job[]>> => {
-    const { data } = await api.get('/api/jobs');
+  getAll: async (filter?: string): Promise<ApiResponse<Job[]>> => {
+    const params = filter ? { filter } : undefined;
+    const { data } = await api.get('/api/jobs', { params });
     return data;
   },
 

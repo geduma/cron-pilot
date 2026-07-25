@@ -13,10 +13,11 @@ const PAGE_SIZE = 10;
 
 interface JobsTableProps {
   showActions?: boolean;
+  filter?: string;
 }
 
-export function JobsTable({ showActions = true }: JobsTableProps) {
-  const { data, isLoading } = useJobs();
+export function JobsTable({ showActions = true, filter }: JobsTableProps) {
+  const { data, isLoading } = useJobs(filter);
   const runJob = useRunJob();
   const deleteJob = useDeleteJob();
   const { toast } = useToast();
