@@ -19,7 +19,7 @@ function ToastItem({ toast, onDismiss }: ToastItemProps) {
     const timer = setTimeout(() => {
       setVisible(false);
       setTimeout(() => onDismiss(toast.id), 300);
-    }, 4000);
+    }, toast.type === 'error' ? 8000 : 4000);
     return () => clearTimeout(timer);
   }, [toast.id, onDismiss]);
 
@@ -54,7 +54,7 @@ function ToastItem({ toast, onDismiss }: ToastItemProps) {
       }`}
     >
       {icons[toast.type]}
-      <p className="text-sm font-medium flex-1">{toast.message}</p>
+      <p className="text-sm font-medium flex-1 whitespace-pre-line">{toast.message}</p>
       <button
         onClick={() => {
           setVisible(false);
@@ -77,7 +77,7 @@ interface ToastContainerProps {
 
 export function ToastContainer({ toasts, onDismiss }: ToastContainerProps) {
   return (
-    <div className="fixed bottom-4 right-4 z-[100] flex flex-col gap-2 max-w-sm w-full pointer-events-none">
+    <div className="fixed bottom-4 right-4 z-[100] flex flex-col gap-2 max-w-md w-full pointer-events-none">
       {toasts.map((toast) => (
         <div key={toast.id} className="pointer-events-auto">
           <ToastItem toast={toast} onDismiss={onDismiss} />
