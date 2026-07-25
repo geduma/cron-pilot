@@ -153,13 +153,23 @@ export function JobForm({ jobId }: JobFormProps) {
       {
         onSuccess: (response) => {
           const result = response.data;
+          console.log('[TestRun]', result);
+
           if (result.status === 'SUCCESS') {
-            toast.success(`OK ${result.httpStatus} - ${result.durationMs}ms`);
+            const preview = result.responseBody
+              ? ` | Body: ${result.responseBody.substring(0, 120)}${result.responseBody.length > 120 ? '...' : ''}`
+              : '';
+            toast.success(`${result.httpStatus} OK - ${result.durationMs}ms${preview}`);
           } else {
-            toast.error(`${result.status}: ${result.error || result.httpStatus}`);
+            const errorDetail = result.error ? `\n${result.error}` : '';
+            const bodyDetail = result.responseBody
+              ? `\nResponse: ${result.responseBody.substring(0, 200)}${result.responseBody.length > 200 ? '...' : ''}`
+              : '';
+            toast.error(`${result.status} (${result.httpStatus}) - ${result.durationMs}ms${errorDetail}${bodyDetail}`);
           }
         },
-        onError: () => {
+        onError: (error) => {
+          console.error('[TestRun] Error:', error);
           toast.error('Failed to execute test run');
         }
       }

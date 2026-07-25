@@ -1,6 +1,7 @@
 import type Database from 'better-sqlite3';
 import type { Job } from '../types/index.js';
 import { calculateNextExecution, generateUUID } from '../utils/helpers.js';
+import { mapRowsToCamel } from '../utils/mappers.js';
 
 export class Scheduler {
   private intervalId: NodeJS.Timeout | null = null;
@@ -54,7 +55,7 @@ export class Scheduler {
          LIMIT 10`
       );
 
-      const jobs = stmt.all() as Job[];
+      const jobs = mapRowsToCamel<Job>(stmt.all() as Record<string, unknown>[]);
 
       if (jobs.length > 0) {
         console.log(`Found ${jobs.length} jobs to execute`);
