@@ -9,7 +9,7 @@ Guidelines for AI agents working on this codebase.
 CronPilot is a self-hosted web app for scheduling and monitoring HTTP jobs. Monorepo with frontend + backend.
 
 **Stack:**
-- Frontend: React 18, Vite, TypeScript, TailwindCSS, React Query, React Router, Axios
+- Frontend: React 19, Vite, TypeScript, TailwindCSS, React Query, React Router, Axios
 - Backend: Node.js, Fastify, TypeScript
 - Database: SQLite (file-based, zero config)
 - Auth: Geduma Auth (external OAuth service, GitHub provider)
@@ -223,13 +223,15 @@ Error:
 
 ### JobForm
 - Toggle switch for active/paused status
-- Test Run button (executes without saving)
-- Toast notifications on success/error
+- Test Run button (executes without saving, logs full result to console)
+- Toast shows HTTP status, duration, error details, and response body preview
 
 ### Toast System
 - `ToastProvider` wraps app in `App.tsx`
 - `useToast()` hook — `toast.success()`, `toast.error()`
-- Auto-dismiss after 3 seconds
+- Auto-dismiss: 4s for success/info, 8s for errors
+- Supports multiline messages (`whitespace-pre-line`)
+- Dashboard error card links to `/jobs`
 
 ---
 
