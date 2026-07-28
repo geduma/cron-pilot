@@ -1,7 +1,7 @@
 import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { authMiddleware } from '../plugins/auth.js';
 import type { CreateJobRequest, UpdateJobRequest, Job, ApiResponse } from '../types/index.js';
-import { calculateNextExecution, generateUUID } from '../utils/helpers.js';
+import { calculateNextExecution, generateUUID, toSQLiteDatetime } from '../utils/helpers.js';
 import { mapRowToCamel, mapRowsToCamel } from '../utils/mappers.js';
 
 interface JobParams {
@@ -153,7 +153,7 @@ export default async function jobsRoutes(fastify: FastifyInstance): Promise<void
       });
     }
 
-    const nextExecution = calculateNextExecution(body.frequency).toISOString();
+    const nextExecution = toSQLiteDatetime(calculateNextExecution(body.frequency));
     const id = generateUUID();
 
     const stmt = fastify.db.prepare(
@@ -270,7 +270,7 @@ export default async function jobsRoutes(fastify: FastifyInstance): Promise<void
       updates.push('frequency = ?');
       values.push(body.frequency);
       // Recalculate next execution if frequency changed
-      const nextExecution = calculateNextExecution(body.frequency, new Date()).toISOString();
+      const nextExecution = toSQLiteDatetime(calculateNextExecution(body.frequency, new Date()));
       updates.push('next_execution = ?');
       values.push(nextExecution);
     }

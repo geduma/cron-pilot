@@ -27,3 +27,7 @@ export function calculateNextExecution(frequency: JobFrequency, lastExecution?: 
 export function getFrequencyMs(frequency: JobFrequency): number {
   return FREQUENCIES[frequency];
 }
+
+export function toSQLiteDatetime(date: Date): string {
+  return date.toISOString().replace('T', ' ').replace(/\.\d{3}Z$/, '');
+}

@@ -1,6 +1,6 @@
 import type Database from 'better-sqlite3';
 import type { Job } from '../types/index.js';
-import { calculateNextExecution, generateUUID } from '../utils/helpers.js';
+import { calculateNextExecution, generateUUID, toSQLiteDatetime } from '../utils/helpers.js';
 import { mapRowsToCamel } from '../utils/mappers.js';
 
 export class Scheduler {
@@ -132,8 +132,22 @@ export class Scheduler {
        VALUES (?, ?, ?, ?, ?, ?, ?)`
     ).run(executionId, job.id, status, httpStatus, durationMs, responseBody || null, errorMessage || null);
 
-    // Update job
-    const nextExecution = calculateNextExecution(job.frequency, new Date()).toISOString();
+    // Calculate next execution based on when this execution was actually scheduled,
+    // not the current time, to avoid schedule drift
+    let nextExecution: string;
+    const nextExecStr = job.nextExecution as unknown as string;
+    if (nextExecStr) {
+      const normalized = nextExecStr.includes('T')
+        ? nextExecStr
+        : nextExecStr.replace(' ', 'T') + 'Z';
+      const scheduledTime = new Date(normalized);
+      const nextDate = calculateNextExecution(job.frequency, scheduledTime);
+      nextExecution = toSQLiteDatetime(nextDate);
+    } else {
+      const nextDate = calculateNextExecution(job.frequency);
+      nextExecution = toSQLiteDatetime(nextDate);
+    }
+
     this.db.prepare(
       `UPDATE jobs
        SET last_execution = datetime('now'),
