@@ -63,6 +63,13 @@ export function initDatabase(): Database.Database {
 
   // Run migrations automatically
   db.exec(migrations);
+
+  // Fix existing ISO 8601 dates to SQLite-compatible format
+  db.exec(
+    `UPDATE jobs SET next_execution = SUBSTR(REPLACE(REPLACE(next_execution, 'T', ' '), 'Z', ''), 1, 19)
+     WHERE next_execution LIKE '%T%'`
+  );
+
   console.log(`SQLite database: ${dbPath}`);
 
   return db;
